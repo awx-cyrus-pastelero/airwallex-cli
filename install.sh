@@ -72,7 +72,7 @@ main() {
 
     info "Installed ${BIN_NAME} to ${INSTALL_DIR}/${BIN_NAME}"
 
-    installed_version=$("${INSTALL_DIR}/${BIN_NAME}" --version 2>/dev/null || echo "unknown")
+    installed_version=$("${INSTALL_DIR}/${BIN_NAME}" --no-telemetry --version 2>/dev/null || echo "unknown")
     info "Version: ${installed_version}"
 
     case ":$PATH:" in
