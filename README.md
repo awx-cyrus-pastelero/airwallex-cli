@@ -16,33 +16,34 @@ The Airwallex CLI helps you build, test, and manage your Airwallex integration r
 
 Airwallex CLI is available for macOS and Linux as a single self-contained binary — no Python, pip, or runtime needed.
 
-### macOS
+### One-liner (recommended)
 
 ```sh
-curl -fL -o airwallex \
-  https://github.com/awx-cyrus-pastelero/airwallex-cli/releases/latest/download/airwallex-darwin-arm64
-chmod +x airwallex && xattr -cr airwallex
-sudo mv airwallex /usr/local/bin/
+curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | sh
 ```
 
-For Intel Macs, replace `airwallex-darwin-arm64` with `airwallex-darwin-amd64`.
-
-### Linux
+Auto-detects your OS and architecture, installs to `~/.local/bin/airwallex`. To pin a version or change the install location:
 
 ```sh
-curl -fL -o airwallex \
-  https://github.com/awx-cyrus-pastelero/airwallex-cli/releases/latest/download/airwallex-linux-amd64
-chmod +x airwallex
-sudo mv airwallex /usr/local/bin/
+curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | \
+    AWX_VERSION=v0.1.0 AWX_INSTALL_DIR=/usr/local/bin sh
 ```
 
-For arm64 hosts (AWS Graviton, Raspberry Pi), use `airwallex-linux-arm64`.
+### Manual download
 
-### Without `sudo`
+Grab the binary for your platform from the [latest release](https://github.com/awx-cyrus-pastelero/airwallex-cli/releases/latest):
+
+| Platform                            | Asset                       |
+| ----------------------------------- | --------------------------- |
+| macOS Apple Silicon (M1/M2/M3/M4)   | `airwallex-darwin-arm64`    |
+| macOS Intel                         | `airwallex-darwin-amd64`    |
+| Linux x86_64                        | `airwallex-linux-amd64`     |
+| Linux arm64                         | `airwallex-linux-arm64`     |
 
 ```sh
-mkdir -p ~/.local/bin && mv airwallex ~/.local/bin/
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+chmod +x airwallex-*
+xattr -cr airwallex-*    # macOS only — strips Gatekeeper quarantine
+mv airwallex-* /usr/local/bin/airwallex
 ```
 
 ## Usage
