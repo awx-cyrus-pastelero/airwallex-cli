@@ -18,15 +18,20 @@ Airwallex CLI is available for macOS and Linux as a single self-contained binary
 
 ### One-liner (recommended)
 
+Auto-detects your OS and architecture, installs to `~/.local/bin/airwallex`:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | sh
 ```
 
-Auto-detects your OS and architecture, installs to `~/.local/bin/airwallex`. To pin a version or change the install location:
+To pin a version or change the install location, prefix `sh` with the relevant variable(s):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | \
-    AWX_VERSION=v0.1.0 AWX_INSTALL_DIR=/usr/local/bin sh
+curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | AWX_VERSION=v0.1.0 sh
+```
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | AWX_INSTALL_DIR=/usr/local/bin sh
 ```
 
 ### Manual download
