@@ -46,28 +46,12 @@ xattr -cr airwallex    # macOS only — strips Gatekeeper quarantine
 mv airwallex /usr/local/bin/airwallex
 ```
 
-### Linux package managers
-
-Native packages are also published for each release:
-
-| Distro family             | Asset                                  |
-| ------------------------- | -------------------------------------- |
-| Debian / Ubuntu (amd64)   | `airwallex_<version>_linux_amd64.deb`  |
-| Debian / Ubuntu (arm64)   | `airwallex_<version>_linux_arm64.deb`  |
-| Fedora / RHEL (amd64)     | `airwallex_<version>_linux_amd64.rpm`  |
-| Fedora / RHEL (arm64)     | `airwallex_<version>_linux_arm64.rpm`  |
-
-```sh
-sudo dpkg -i airwallex_*_linux_*.deb     # Debian / Ubuntu
-sudo rpm  -i airwallex_*_linux_*.rpm     # Fedora / RHEL
-```
-
 ### Verifying downloads
 
 Each release ships SHA256 checksums for every asset:
 
 - `airwallex-mac-checksums.txt` — covers all `mac-os_*.tar.gz` archives
-- `airwallex-linux-checksums.txt` — covers all `linux_*` archives and packages
+- `airwallex-linux-checksums.txt` — covers all `linux_*.tar.gz` archives
 
 ```sh
 shasum -a 256 -c airwallex-mac-checksums.txt    # macOS
