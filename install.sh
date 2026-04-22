@@ -177,13 +177,6 @@ main() {
 
     chmod +x "${tmp}/${BIN_NAME}"
 
-    # Strip macOS Gatekeeper quarantine attribute. We only target the one
-    # file we just extracted (no `-r`) — the user trusted us to install
-    # `airwallex` and nothing more. Silently no-op on Linux.
-    if [ "$(uname -s)" = "Darwin" ] && command -v xattr >/dev/null 2>&1; then
-        xattr -d com.apple.quarantine "${tmp}/${BIN_NAME}" 2>/dev/null || true
-    fi
-
     mkdir -p "$INSTALL_DIR"
     mv "${tmp}/${BIN_NAME}" "${INSTALL_DIR}/${BIN_NAME}"
 
