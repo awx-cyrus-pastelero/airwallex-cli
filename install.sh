@@ -15,22 +15,54 @@ BIN_NAME="airwallex"
 INSTALL_DIR="${AWX_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION="${AWX_VERSION:-latest}"
 
-# Colors only when stdout is a terminal — keeps output clean in CI / log files.
-if [ -t 1 ]; then
-    BLUE='\033[1;34m'
-    YELLOW='\033[1;33m'
-    RED='\033[1;31m'
-    RESET='\033[0m'
+# Colors via terminfo so we get real ESC bytes (not literal '\033[…]').
+# `tput setaf` is universally available on POSIX systems and respects
+# $TERM. Falls back to empty strings when stdout isn't a tty (CI, log
+# files) or terminfo doesn't know how to colour the current terminal.
+if [ -t 1 ] && command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
+    BOLD=$(tput bold)
+    DIM=$(tput dim)
+    BLUE=$(tput setaf 4)
+    GREEN=$(tput setaf 2)
+    YELLOW=$(tput setaf 3)
+    RED=$(tput setaf 1)
+    RESET=$(tput sgr0)
 else
+    BOLD=''
+    DIM=''
     BLUE=''
+    GREEN=''
     YELLOW=''
     RED=''
     RESET=''
 fi
 
-info() { printf '%s==>%s %s\n' "$BLUE" "$RESET" "$*"; }
-warn() { printf '%s!!%s  %s\n'  "$YELLOW" "$RESET" "$*" >&2; }
-err()  { printf '%sxx%s  %s\n'  "$RED"    "$RESET" "$*" >&2; exit 1; }
+# Output helpers. Glyphs are UTF-8; modern macOS / Linux terminals all
+# render these correctly. Reserve plain ASCII fallbacks for the rare
+# legacy terminal: '*' for step, '+' for ok, '!' for warn, 'x' for err.
+if [ "${LANG:-}" != "${LANG#*UTF-8}" ] || [ "${LC_ALL:-}" != "${LC_ALL#*UTF-8}" ]; then
+    G_STEP='→'
+    G_OK='✓'
+    G_WARN='!'
+    G_ERR='✗'
+else
+    G_STEP='*'
+    G_OK='+'
+    G_WARN='!'
+    G_ERR='x'
+fi
+
+# Output levels:
+#   header(): one-time banner at the top
+#   step():   a unit of progress (blue arrow)
+#   ok():     a success summary line (green check)
+#   warn():   non-fatal warning (yellow bang)
+#   err():    fatal error (red x), exits 1
+header() { printf '\n%s%sairwallex CLI installer%s\n\n' "$BOLD" "$BLUE" "$RESET"; }
+step()   { printf '  %s%s%s %s\n' "$BLUE"   "$G_STEP" "$RESET" "$*"; }
+ok()     { printf '  %s%s%s %s\n' "$GREEN"  "$G_OK"   "$RESET" "$*"; }
+warn()   { printf '  %s%s%s %s\n' "$YELLOW" "$G_WARN" "$RESET" "$*" >&2; }
+err()    { printf '\n  %s%s%s %s\n\n' "$RED" "$G_ERR" "$RESET" "$*" >&2; exit 1; }
 
 # Detect the platform and emit the asset-name fragment used in release
 # filenames. We deliberately use `mac-os` / `x86_64` rather than
@@ -108,10 +140,12 @@ main() {
     command -v curl >/dev/null 2>&1 || err "curl is required but not installed"
     command -v tar  >/dev/null 2>&1 || err "tar is required but not installed"
 
+    header
+
     if [ "$VERSION" = "latest" ]; then
         VERSION=$(resolve_latest_version)
-        info "Resolved latest version: ${VERSION}"
     fi
+    step "Latest version: ${BOLD}${VERSION}${RESET}"
 
     # Strip a leading "v" so the asset filename matches the package version
     # embedded in pyproject.toml (e.g. v0.1.0 -> 0.1.0).
@@ -121,10 +155,9 @@ main() {
     asset="airwallex_${version_no_v}_${platform}.tar.gz"
     url="https://github.com/${REPO}/releases/download/${VERSION}/${asset}"
 
-    info "Detected platform: ${platform}"
     check_writable "$INSTALL_DIR"
 
-    info "Downloading ${asset}..."
+    step "Downloading ${asset}"
 
     # Explicit template for portability across BSD/GNU mktemp variants.
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/awx-cli.XXXXXX")
@@ -134,7 +167,6 @@ main() {
         err "Failed to download from $url"
     fi
 
-    info "Extracting..."
     if ! tar -xzf "${tmp}/${asset}" -C "$tmp"; then
         err "Failed to extract ${asset}"
     fi
@@ -145,33 +177,37 @@ main() {
 
     chmod +x "${tmp}/${BIN_NAME}"
 
-    # Strip macOS Gatekeeper quarantine attribute (silently ignored on Linux).
-    if [ "$(uname -s)" = "Darwin" ]; then
-        xattr -cr "${tmp}/${BIN_NAME}" 2>/dev/null || true
+    # Strip macOS Gatekeeper quarantine attribute. We only target the one
+    # file we just extracted (no `-r`) — the user trusted us to install
+    # `airwallex` and nothing more. Silently no-op on Linux.
+    if [ "$(uname -s)" = "Darwin" ] && command -v xattr >/dev/null 2>&1; then
+        xattr -d com.apple.quarantine "${tmp}/${BIN_NAME}" 2>/dev/null || true
     fi
 
     mkdir -p "$INSTALL_DIR"
     mv "${tmp}/${BIN_NAME}" "${INSTALL_DIR}/${BIN_NAME}"
 
-    info "Installed ${BIN_NAME} to ${INSTALL_DIR}/${BIN_NAME}"
-
     # --no-telemetry keeps the version check fast and avoids holding open a
     # network handle when stdout is captured by command substitution.
-    installed_version=$("${INSTALL_DIR}/${BIN_NAME}" --no-telemetry --version 2>/dev/null || echo "unknown")
-    info "Version: ${installed_version}"
+    installed_version=$("${INSTALL_DIR}/${BIN_NAME}" --no-telemetry --version 2>/dev/null || echo "${version_no_v}")
+
+    ok "Installed ${BOLD}${BIN_NAME} ${installed_version}${RESET} to ${DIM}${INSTALL_DIR}/${BIN_NAME}${RESET}"
 
     case ":$PATH:" in
         *":${INSTALL_DIR}:"*)
-            info "Run '${BIN_NAME} --help' to get started."
+            printf '\n  Run %s%s --help%s to get started.\n\n' "$BOLD" "$BIN_NAME" "$RESET"
             ;;
         *)
+            # All to stdout so this stays in order with the lines above. We
+            # don't use warn() here because warn() writes to stderr, which
+            # interleaves non-deterministically when stdout is piped.
             rc_file=$(suggest_rc_file)
-            warn "${INSTALL_DIR} is not on your PATH."
-            warn "Add it by appending the following to ${rc_file}:"
-            warn ""
-            warn "    export PATH=\"${INSTALL_DIR}:\$PATH\""
-            warn ""
-            warn "Or run the binary directly: ${INSTALL_DIR}/${BIN_NAME} --help"
+            printf '\n  %s%s%s %s%s%s is not on your PATH.\n' \
+                "$YELLOW" "$G_WARN" "$RESET" "$BOLD" "$INSTALL_DIR" "$RESET"
+            printf '\n    Add this line to %s%s%s:\n        %sexport PATH="%s:\$PATH"%s\n' \
+                "$BOLD" "$rc_file" "$RESET" "$DIM" "$INSTALL_DIR" "$RESET"
+            printf '\n    Or run %s%s/%s --help%s directly.\n\n' \
+                "$BOLD" "$INSTALL_DIR" "$BIN_NAME" "$RESET"
             ;;
     esac
 }
