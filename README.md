@@ -31,19 +31,47 @@ curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/m
 
 ### Manual download
 
-Grab the binary for your platform from the [latest release](https://github.com/awx-cyrus-pastelero/airwallex-cli/releases/latest):
+Grab the archive for your platform from the [latest release](https://github.com/awx-cyrus-pastelero/airwallex-cli/releases/latest):
 
-| Platform                            | Asset                       |
-| ----------------------------------- | --------------------------- |
-| macOS Apple Silicon (M1/M2/M3/M4)   | `airwallex-darwin-arm64`    |
-| macOS Intel                         | `airwallex-darwin-amd64`    |
-| Linux x86_64                        | `airwallex-linux-amd64`     |
-| Linux arm64                         | `airwallex-linux-arm64`     |
+| Platform                            | Asset                                       |
+| ----------------------------------- | ------------------------------------------- |
+| macOS Apple Silicon (M1/M2/M3/M4)   | `airwallex_<version>_mac-os_arm64.tar.gz`   |
+| macOS Intel                         | `airwallex_<version>_mac-os_x86_64.tar.gz`  |
+| Linux x86_64                        | `airwallex_<version>_linux_x86_64.tar.gz`   |
+| Linux arm64                         | `airwallex_<version>_linux_arm64.tar.gz`    |
 
 ```sh
-chmod +x airwallex-*
-xattr -cr airwallex-*    # macOS only — strips Gatekeeper quarantine
-mv airwallex-* /usr/local/bin/airwallex
+tar -xzf airwallex_*_*.tar.gz
+xattr -cr airwallex    # macOS only — strips Gatekeeper quarantine
+mv airwallex /usr/local/bin/airwallex
+```
+
+### Linux package managers
+
+Native packages are also published for each release:
+
+| Distro family             | Asset                                  |
+| ------------------------- | -------------------------------------- |
+| Debian / Ubuntu (amd64)   | `airwallex_<version>_linux_amd64.deb`  |
+| Debian / Ubuntu (arm64)   | `airwallex_<version>_linux_arm64.deb`  |
+| Fedora / RHEL (amd64)     | `airwallex_<version>_linux_amd64.rpm`  |
+| Fedora / RHEL (arm64)     | `airwallex_<version>_linux_arm64.rpm`  |
+
+```sh
+sudo dpkg -i airwallex_*_linux_*.deb     # Debian / Ubuntu
+sudo rpm  -i airwallex_*_linux_*.rpm     # Fedora / RHEL
+```
+
+### Verifying downloads
+
+Each release ships SHA256 checksums for every asset:
+
+- `airwallex-mac-checksums.txt` — covers all `mac-os_*.tar.gz` archives
+- `airwallex-linux-checksums.txt` — covers all `linux_*` archives and packages
+
+```sh
+shasum -a 256 -c airwallex-mac-checksums.txt    # macOS
+sha256sum     -c airwallex-linux-checksums.txt  # Linux
 ```
 
 ## Usage

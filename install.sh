@@ -32,23 +32,28 @@ info() { printf '%s==>%s %s\n' "$BLUE" "$RESET" "$*"; }
 warn() { printf '%s!!%s  %s\n'  "$YELLOW" "$RESET" "$*" >&2; }
 err()  { printf '%sxx%s  %s\n'  "$RED"    "$RESET" "$*" >&2; exit 1; }
 
+# Detect the platform and emit the asset-name fragment used in release
+# filenames. We deliberately use `mac-os` / `x86_64` rather than
+# `darwin` / `amd64` so the asset names match every other major CLI's
+# convention — installer scripts and package mirrors slot in without a
+# custom URL template.
 detect_platform() {
     os=$(uname -s | tr '[:upper:]' '[:lower:]')
     arch=$(uname -m)
 
     case "$os" in
-        darwin) os="darwin" ;;
-        linux)  os="linux" ;;
+        darwin) os_label="mac-os" ;;
+        linux)  os_label="linux" ;;
         *)      err "Unsupported OS: $os (supported: darwin, linux)" ;;
     esac
 
     case "$arch" in
-        x86_64|amd64) arch="amd64" ;;
-        arm64|aarch64) arch="arm64" ;;
-        *) err "Unsupported architecture: $arch (supported: amd64, arm64)" ;;
+        x86_64|amd64)   arch_label="x86_64" ;;
+        arm64|aarch64)  arch_label="arm64" ;;
+        *) err "Unsupported architecture: $arch (supported: x86_64, arm64)" ;;
     esac
 
-    echo "${os}-${arch}"
+    echo "${os_label}_${arch_label}"
 }
 
 # Suggest the right shell rc file based on $SHELL — falls back to a generic hint.
@@ -81,29 +86,61 @@ check_writable() {
     fi
 }
 
+# Resolve the latest release tag from the GitHub API. Asset filenames are
+# versioned (airwallex_0.1.0_...), so we can't use the
+# /releases/latest/download/<asset> redirect — we have to know the
+# concrete version first.
+resolve_latest_version() {
+    api_url="https://api.github.com/repos/${REPO}/releases/latest"
+    # `grep -E "tag_name"` then a portable cut to extract the value works
+    # without jq, which is rarely pre-installed on minimal Linux images.
+    tag=$(curl -fsSL "$api_url" 2>/dev/null \
+        | grep -E '"tag_name"[[:space:]]*:' \
+        | head -n 1 \
+        | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+    if [ -z "$tag" ]; then
+        err "Failed to resolve latest version from $api_url"
+    fi
+    echo "$tag"
+}
+
 main() {
     command -v curl >/dev/null 2>&1 || err "curl is required but not installed"
-
-    platform=$(detect_platform)
-    asset="${BIN_NAME}-${platform}"
+    command -v tar  >/dev/null 2>&1 || err "tar is required but not installed"
 
     if [ "$VERSION" = "latest" ]; then
-        url="https://github.com/${REPO}/releases/latest/download/${asset}"
-    else
-        url="https://github.com/${REPO}/releases/download/${VERSION}/${asset}"
+        VERSION=$(resolve_latest_version)
+        info "Resolved latest version: ${VERSION}"
     fi
+
+    # Strip a leading "v" so the asset filename matches the package version
+    # embedded in pyproject.toml (e.g. v0.1.0 -> 0.1.0).
+    version_no_v=${VERSION#v}
+
+    platform=$(detect_platform)
+    asset="airwallex_${version_no_v}_${platform}.tar.gz"
+    url="https://github.com/${REPO}/releases/download/${VERSION}/${asset}"
 
     info "Detected platform: ${platform}"
     check_writable "$INSTALL_DIR"
 
-    info "Downloading ${asset} from ${VERSION} release..."
+    info "Downloading ${asset}..."
 
     # Explicit template for portability across BSD/GNU mktemp variants.
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/awx-cli.XXXXXX")
     trap 'rm -rf "$tmp"' EXIT
 
-    if ! curl -fsSL -o "${tmp}/${BIN_NAME}" "$url"; then
+    if ! curl -fsSL -o "${tmp}/${asset}" "$url"; then
         err "Failed to download from $url"
+    fi
+
+    info "Extracting..."
+    if ! tar -xzf "${tmp}/${asset}" -C "$tmp"; then
+        err "Failed to extract ${asset}"
+    fi
+
+    if [ ! -f "${tmp}/${BIN_NAME}" ]; then
+        err "Archive did not contain expected '${BIN_NAME}' binary"
     fi
 
     chmod +x "${tmp}/${BIN_NAME}"
