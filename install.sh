@@ -5,15 +5,16 @@
 #   curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | sh
 #
 # Environment variables:
-#   AWX_VERSION       pin a specific release (default: latest, e.g. v0.1.0)
-#   AWX_INSTALL_DIR   install location (default: $HOME/.local/bin)
+#   AIRWALLEX_VERSION       pin a specific release (default: latest, e.g. v0.1.0)
+#   AIRWALLEX_INSTALL_DIR   install location (default: $HOME/.local/bin)
 
 set -eu
 
 REPO="awx-cyrus-pastelero/airwallex-cli"
 BIN_NAME="airwallex"
-INSTALL_DIR="${AWX_INSTALL_DIR:-$HOME/.local/bin}"
-VERSION="${AWX_VERSION:-latest}"
+INSTALL_DIR="${AIRWALLEX_INSTALL_DIR:-$HOME/.local/bin}"
+STATE_DIR="${HOME}/.local/share/airwallex"
+VERSION="${AIRWALLEX_VERSION:-latest}"
 
 # Colors via terminfo so we get real ESC bytes (not literal '\033[…]').
 # `tput setaf` is universally available on POSIX systems and respects
@@ -128,14 +129,14 @@ check_writable() {
         if [ ! -w "$dir" ]; then
             err "$(printf '%s' "Cannot write to $dir.
     Re-run with sudo, or pick a writable location:
-        AWX_INSTALL_DIR=\$HOME/.local/bin curl -fsSL ... | sh")"
+        AIRWALLEX_INSTALL_DIR=\$HOME/.local/bin curl -fsSL ... | sh")"
         fi
     else
         parent=$(dirname "$dir")
         if [ ! -w "$parent" ]; then
             err "$(printf '%s' "Cannot create $dir (parent $parent is not writable).
     Re-run with sudo, or pick a writable location:
-        AWX_INSTALL_DIR=\$HOME/.local/bin curl -fsSL ... | sh")"
+        AIRWALLEX_INSTALL_DIR=\$HOME/.local/bin curl -fsSL ... | sh")"
         fi
     fi
 }
@@ -182,7 +183,7 @@ main() {
     step "Downloading ${asset}"
 
     # Explicit template for portability across BSD/GNU mktemp variants.
-    tmp=$(mktemp -d "${TMPDIR:-/tmp}/awx-cli.XXXXXX")
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/airwallex-cli.XXXXXX")
     trap 'rm -rf "$tmp"' EXIT
 
     if ! curl -fsSL -o "${tmp}/${asset}" "$url"; then
@@ -232,8 +233,8 @@ main() {
         fi
     fi
 
-    # --no-telemetry keeps the version check fast and avoids holding open a
-    # network handle when stdout is captured by command substitution.
+    mkdir -p "$STATE_DIR"
+
     installed_version=$("${INSTALL_DIR}/${BIN_NAME}" --no-telemetry --version 2>/dev/null || echo "${version_no_v}")
 
     ok "Installed ${BOLD}${BIN_NAME} ${installed_version}${RESET} to ${DIM}${INSTALL_DIR}/${BIN_NAME}${RESET}"
