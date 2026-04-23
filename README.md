@@ -3,7 +3,7 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/awx-cyrus-pastelero/airwallex-cli)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-The Airwallex CLI helps you build, test, and manage your Airwallex integration right from the terminal.
+The Airwallex CLI helps you manage your Airwallex account right from the terminal.
 
 **With the CLI, you can:**
 
@@ -54,8 +54,3 @@ For a full reference, see the [Airwallex API docs](https://www.airwallex.com/doc
 
 Got feedback? Open an issue or run `airwallex feedback`.
 
-## License
-
-Copyright (c) 2020-present, Airwallex, Inc.
-
-Licensed under the [MIT License](LICENSE).
