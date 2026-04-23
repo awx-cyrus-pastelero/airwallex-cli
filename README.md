@@ -35,14 +35,14 @@ airwallex [command] --help
 
 - `auth` — sign in and inspect the current session
 - `balances` — view balance activity and totals
-- `beneficiaries` — view and manage payout beneficiaries
+- `beneficiaries`, `beneficiary-schema` — manage payout beneficiaries
 - `billing-customers`, `billing-checkouts`, `billing-transactions` — billing
 - `cards`, `cardholders`, `issuing-transactions` — issuing
-- `conversions`, `quotes` — FX
+- `conversions`, `conversion-amendments`, `conversion-rates`, `quotes` — FX
 - `invoices`, `credit-notes`, `coupons`, `prices`, `products`, `subscriptions`, `meters`, `usage-events` — billing & catalog
-- `payment-links`, `payment-disputes`, `payment-sources`, `pa-customers`, `refunds` — payments
+- `payment-intents`, `payment-links`, `payment-disputes`, `payment-sources`, `payment-customers`, `refunds` — payments
 - `transfers`, `global-accounts` — money movement
-- `spend-bills`, `financial-reports` — spend
+- `spend-bills`, `spend-expenses`, `spend-purchase-orders`, `spend-vendors`, `reimbursement-reports`, `financial-reports` — spend & finance
 - `search-docs` — search the Airwallex API docs
 - `feedback` — report issues or suggestions
 
