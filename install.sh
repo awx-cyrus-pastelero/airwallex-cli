@@ -88,14 +88,36 @@ detect_platform() {
     echo "${os_label}_${arch_label}"
 }
 
-# Suggest the right shell rc file based on $SHELL — falls back to a generic hint.
-suggest_rc_file() {
+# Return the absolute path to the shell rc file for PATH configuration.
+resolve_rc_file() {
     case "${SHELL:-}" in
-        */zsh)  echo "~/.zshrc" ;;
-        */bash) echo "~/.bashrc" ;;
-        */fish) echo "~/.config/fish/config.fish" ;;
-        *)      echo "your shell's startup file" ;;
+        */zsh)  echo "$HOME/.zshrc" ;;
+        */bash) echo "$HOME/.bashrc" ;;
+        */fish) echo "$HOME/.config/fish/config.fish" ;;
+        *)      echo "" ;;
     esac
+}
+
+# Add INSTALL_DIR to PATH in the user's shell rc file if not already present.
+ensure_path() {
+    rc_file=$(resolve_rc_file)
+    [ -z "$rc_file" ] && return 1
+
+    if [ -f "$rc_file" ] && grep -qF "$INSTALL_DIR" "$rc_file" 2>/dev/null; then
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$rc_file")"
+
+    case "${SHELL:-}" in
+        */fish)
+            printf '\nfish_add_path "%s"\n' "$INSTALL_DIR" >> "$rc_file"
+            ;;
+        *)
+            printf '\nexport PATH="%s:$PATH"\n' "$INSTALL_DIR" >> "$rc_file"
+            ;;
+    esac
+    return 0
 }
 
 # Pre-flight: make sure we can actually write to INSTALL_DIR before downloading
@@ -180,6 +202,36 @@ main() {
     mkdir -p "$INSTALL_DIR"
     mv "${tmp}/${BIN_NAME}" "${INSTALL_DIR}/${BIN_NAME}"
 
+    # macOS Gatekeeper handling.
+    #
+    # The CLI binary is not (yet) Apple-notarised, so on macOS each fresh
+    # download arrives with `com.apple.quarantine` set by curl. That attr
+    # is what makes Gatekeeper pop the "cannot be opened because Apple
+    # cannot check it for malicious software" dialog (and, depending on
+    # the policy, an admin password prompt) every time the user runs
+    # `airwallex`.
+    #
+    # Two-step fix, both no-ops on Linux:
+    #   1. Strip every extended attribute on the installed binary
+    #      (`xattr -cr`). This removes com.apple.quarantine plus any
+    #      provenance tags Safari/curl might have layered on.
+    #   2. Apply an ad-hoc code signature (`codesign --sign -`). Even
+    #      without notarisation, a valid signature stops macOS from
+    #      re-prompting on every invocation; the OS only re-checks if
+    #      the signature changes.
+    #
+    # We deliberately operate on the binary AFTER `mv` so the fix
+    # applies at the final install location (xattrs / signatures aren't
+    # always preserved across filesystems).
+    if [ "$(uname -s)" = "Darwin" ]; then
+        if command -v xattr >/dev/null 2>&1; then
+            xattr -cr "${INSTALL_DIR}/${BIN_NAME}" 2>/dev/null || true
+        fi
+        if command -v codesign >/dev/null 2>&1; then
+            codesign --force --sign - "${INSTALL_DIR}/${BIN_NAME}" >/dev/null 2>&1 || true
+        fi
+    fi
+
     # --no-telemetry keeps the version check fast and avoids holding open a
     # network handle when stdout is captured by command substitution.
     installed_version=$("${INSTALL_DIR}/${BIN_NAME}" --no-telemetry --version 2>/dev/null || echo "${version_no_v}")
@@ -188,21 +240,23 @@ main() {
 
     case ":$PATH:" in
         *":${INSTALL_DIR}:"*)
-            printf '\n  Run %s%s --help%s to get started.\n\n' "$BOLD" "$BIN_NAME" "$RESET"
             ;;
         *)
-            # All to stdout so this stays in order with the lines above. We
-            # don't use warn() here because warn() writes to stderr, which
-            # interleaves non-deterministically when stdout is piped.
-            rc_file=$(suggest_rc_file)
-            printf '\n  %s%s%s %s%s%s is not on your PATH.\n' \
-                "$YELLOW" "$G_WARN" "$RESET" "$BOLD" "$INSTALL_DIR" "$RESET"
-            printf '\n    Add this line to %s%s%s:\n        %sexport PATH="%s:\$PATH"%s\n' \
-                "$BOLD" "$rc_file" "$RESET" "$DIM" "$INSTALL_DIR" "$RESET"
-            printf '\n    Or run %s%s/%s --help%s directly.\n\n' \
-                "$BOLD" "$INSTALL_DIR" "$BIN_NAME" "$RESET"
+            if ensure_path; then
+                rc_file=$(resolve_rc_file)
+                ok "Added ${BOLD}${INSTALL_DIR}${RESET} to ${BOLD}${rc_file}${RESET}"
+                printf '\n  Restart your shell or run:\n        %ssource %s%s\n' \
+                    "$DIM" "$rc_file" "$RESET"
+            else
+                printf '\n  %s%s%s %s%s%s is not on your PATH.\n' \
+                    "$YELLOW" "$G_WARN" "$RESET" "$BOLD" "$INSTALL_DIR" "$RESET"
+                printf '    Add it to your shell startup file:\n        %sexport PATH="%s:\$PATH"%s\n' \
+                    "$DIM" "$INSTALL_DIR" "$RESET"
+            fi
             ;;
     esac
+
+    printf '\n  Run %s%s --help%s to get started.\n\n' "$BOLD" "$BIN_NAME" "$RESET"
 }
 
 main "$@"
