@@ -203,36 +203,6 @@ main() {
     mkdir -p "$INSTALL_DIR"
     mv "${tmp}/${BIN_NAME}" "${INSTALL_DIR}/${BIN_NAME}"
 
-    # macOS Gatekeeper handling.
-    #
-    # The CLI binary is not (yet) Apple-notarised, so on macOS each fresh
-    # download arrives with `com.apple.quarantine` set by curl. That attr
-    # is what makes Gatekeeper pop the "cannot be opened because Apple
-    # cannot check it for malicious software" dialog (and, depending on
-    # the policy, an admin password prompt) every time the user runs
-    # `airwallex`.
-    #
-    # Two-step fix, both no-ops on Linux:
-    #   1. Strip every extended attribute on the installed binary
-    #      (`xattr -cr`). This removes com.apple.quarantine plus any
-    #      provenance tags Safari/curl might have layered on.
-    #   2. Apply an ad-hoc code signature (`codesign --sign -`). Even
-    #      without notarisation, a valid signature stops macOS from
-    #      re-prompting on every invocation; the OS only re-checks if
-    #      the signature changes.
-    #
-    # We deliberately operate on the binary AFTER `mv` so the fix
-    # applies at the final install location (xattrs / signatures aren't
-    # always preserved across filesystems).
-    if [ "$(uname -s)" = "Darwin" ]; then
-        if command -v xattr >/dev/null 2>&1; then
-            xattr -cr "${INSTALL_DIR}/${BIN_NAME}" 2>/dev/null || true
-        fi
-        if command -v codesign >/dev/null 2>&1; then
-            codesign --force --sign - "${INSTALL_DIR}/${BIN_NAME}" >/dev/null 2>&1 || true
-        fi
-    fi
-
     mkdir -p "$STATE_DIR"
 
     installed_version=$("${INSTALL_DIR}/${BIN_NAME}" --no-telemetry --version 2>/dev/null || echo "${version_no_v}")
