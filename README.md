@@ -16,51 +16,10 @@ The Airwallex CLI helps you build, test, and manage your Airwallex integration r
 
 Airwallex CLI is available for macOS and Linux as a single self-contained binary — no Python, pip, or runtime needed.
 
-### One-liner (recommended)
-
 Auto-detects your OS and architecture, installs to `~/.local/bin/airwallex`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | sh
-```
-
-To pin a version or change the install location, prefix `sh` with the relevant variable(s):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | AWX_VERSION=v0.1.0 sh
-```
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/awx-cyrus-pastelero/airwallex-cli/main/install.sh | AWX_INSTALL_DIR=/usr/local/bin sh
-```
-
-### Manual download
-
-Grab the archive for your platform from the [latest release](https://github.com/awx-cyrus-pastelero/airwallex-cli/releases/latest):
-
-| Platform                            | Asset                                       |
-| ----------------------------------- | ------------------------------------------- |
-| macOS Apple Silicon (M1/M2/M3/M4)   | `airwallex_<version>_mac-os_arm64.tar.gz`   |
-| macOS Intel                         | `airwallex_<version>_mac-os_x86_64.tar.gz`  |
-| Linux x86_64                        | `airwallex_<version>_linux_x86_64.tar.gz`   |
-| Linux arm64                         | `airwallex_<version>_linux_arm64.tar.gz`    |
-
-```sh
-tar -xzf airwallex_*_*.tar.gz
-xattr -cr airwallex    # macOS only — strips Gatekeeper quarantine
-mv airwallex /usr/local/bin/airwallex
-```
-
-### Verifying downloads
-
-Each release ships SHA256 checksums for every asset:
-
-- `airwallex-mac-checksums.txt` — covers all `mac-os_*.tar.gz` archives
-- `airwallex-linux-checksums.txt` — covers all `linux_*.tar.gz` archives
-
-```sh
-shasum -a 256 -c airwallex-mac-checksums.txt    # macOS
-sha256sum     -c airwallex-linux-checksums.txt  # Linux
 ```
 
 ## Usage
