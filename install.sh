@@ -75,18 +75,18 @@ detect_platform() {
     arch=$(uname -m)
 
     case "$os" in
-        darwin) os_label="darwin" ;;
+        darwin) os_label="mac-os" ;;
         linux)  os_label="linux" ;;
         *)      err "Unsupported OS: $os (supported: darwin, linux)" ;;
     esac
 
     case "$arch" in
-        x86_64|amd64)   arch_label="amd64" ;;
+        x86_64|amd64)   arch_label="x86_64" ;;
         arm64|aarch64)  arch_label="arm64" ;;
         *) err "Unsupported architecture: $arch (supported: x86_64, arm64)" ;;
     esac
 
-    echo "${os_label}-${arch_label}"
+    echo "${os_label}_${arch_label}"
 }
 
 # Return the absolute path to the shell rc file for PATH configuration.
@@ -141,10 +141,10 @@ check_writable() {
     fi
 }
 
-# Resolve the latest release tag from the GitHub API. Kept even though
-# raw-binary assets are unversioned and could use the
-# /releases/latest/download/<asset> redirect — the installer still prints
-# and records the resolved version for the user.
+# Resolve the latest release tag from the GitHub API. Asset filenames are
+# versioned (airwallex_0.1.0_...), so we can't use the
+# /releases/latest/download/<asset> redirect — we have to know the
+# concrete version first.
 resolve_latest_version() {
     api_url="https://api.github.com/repos/${REPO}/releases/latest"
     # `grep -E "tag_name"` then a portable cut to extract the value works
@@ -161,6 +161,7 @@ resolve_latest_version() {
 
 main() {
     command -v curl >/dev/null 2>&1 || err "curl is required but not installed"
+    command -v tar  >/dev/null 2>&1 || err "tar is required but not installed"
 
     header
 
@@ -169,12 +170,12 @@ main() {
     fi
     step "Latest version: ${BOLD}${VERSION}${RESET}"
 
-    # Strip a leading "v" for display/state purposes only; asset filenames
-    # are not versioned (e.g. airwallex-darwin-arm64).
+    # Strip a leading "v" so the asset filename matches the package version
+    # embedded in pyproject.toml (e.g. v0.1.0 -> 0.1.0).
     version_no_v=${VERSION#v}
 
     platform=$(detect_platform)
-    asset="${BIN_NAME}-${platform}"
+    asset="airwallex_${version_no_v}_${platform}.tar.gz"
     url="https://github.com/${REPO}/releases/download/${VERSION}/${asset}"
 
     check_writable "$INSTALL_DIR"
@@ -185,10 +186,16 @@ main() {
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/airwallex-cli.XXXXXX")
     trap 'rm -rf "$tmp"' EXIT
 
-    # Asset is a raw executable (no archive); download directly to BIN_NAME
-    # so no extract step is needed.
-    if ! curl -fsSL -o "${tmp}/${BIN_NAME}" "$url"; then
+    if ! curl -fsSL -o "${tmp}/${asset}" "$url"; then
         err "Failed to download from $url"
+    fi
+
+    if ! tar -xzf "${tmp}/${asset}" -C "$tmp"; then
+        err "Failed to extract ${asset}"
+    fi
+
+    if [ ! -f "${tmp}/${BIN_NAME}" ]; then
+        err "Archive did not contain expected '${BIN_NAME}' binary"
     fi
 
     chmod +x "${tmp}/${BIN_NAME}"
