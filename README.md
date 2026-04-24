@@ -1,7 +1,6 @@
 # Airwallex CLI
 
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/awx-cyrus-pastelero/airwallex-cli)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 The Airwallex CLI helps you manage your Airwallex account right from the terminal.
 
