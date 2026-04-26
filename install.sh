@@ -66,22 +66,25 @@ warn()   { printf '  %s%s%s %s\n' "$YELLOW" "$G_WARN" "$RESET" "$*" >&2; }
 err()    { printf '\n  %s%s%s %s\n\n' "$RED" "$G_ERR" "$RESET" "$*" >&2; exit 1; }
 
 # Detect the platform and emit the asset-name fragment used in release
-# filenames. We deliberately use `mac-os` / `x86_64` rather than
-# `darwin` / `amd64` so the asset names match every other major CLI's
-# convention — installer scripts and package mirrors slot in without a
-# custom URL template.
+# filenames. macOS builds use `macos` and `x86_64`; Linux builds use
+# `linux` and `amd64`.
 detect_platform() {
     os=$(uname -s | tr '[:upper:]' '[:lower:]')
     arch=$(uname -m)
 
     case "$os" in
-        darwin) os_label="mac-os" ;;
+        darwin) os_label="macos" ;;
         linux)  os_label="linux" ;;
         *)      err "Unsupported OS: $os (supported: darwin, linux)" ;;
     esac
 
     case "$arch" in
-        x86_64|amd64)   arch_label="x86_64" ;;
+        x86_64|amd64)
+            case "$os_label" in
+                macos) arch_label="x86_64" ;;
+                *)     arch_label="amd64" ;;
+            esac
+            ;;
         arm64|aarch64)  arch_label="arm64" ;;
         *) err "Unsupported architecture: $arch (supported: x86_64, arm64)" ;;
     esac
