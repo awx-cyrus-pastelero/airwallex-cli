@@ -40,18 +40,14 @@ fi
 
 # Output helpers. Glyphs are UTF-8; modern macOS / Linux terminals all
 # render these correctly. Reserve plain ASCII fallbacks for the rare
-# legacy terminal: '*' for step, '+' for ok, '!' for warn, 'x' for err.
-if [ "${LANG:-}" != "${LANG#*UTF-8}" ] || [ "${LC_ALL:-}" != "${LC_ALL#*UTF-8}" ]; then
-    G_STEP='→'
-    G_OK='✓'
-    G_WARN='!'
-    G_ERR='✗'
-else
-    G_STEP='*'
-    G_OK='+'
-    G_WARN='!'
-    G_ERR='x'
-fi
+# legacy terminal.
+_lang="${LANG:-}${LC_ALL:-}"
+case "$_lang" in
+    *UTF-8*|*utf-8*|*utf8*)
+        G_STEP='→'  G_OK='✓'  G_WARN='!'  G_ERR='✗' ;;
+    *)
+        G_STEP='*'  G_OK='+'  G_WARN='!'  G_ERR='x' ;;
+esac
 
 # Output levels:
 #   header(): one-time banner at the top
@@ -93,54 +89,60 @@ detect_platform() {
 }
 
 # Return the absolute path to the shell rc file for PATH configuration.
+# Falls back to ~/.profile when $SHELL is unset (common in minimal
+# containers and piped-from-curl contexts).
 resolve_rc_file() {
     case "${SHELL:-}" in
         */zsh)  echo "$HOME/.zshrc" ;;
         */bash) echo "$HOME/.bashrc" ;;
         */fish) echo "$HOME/.config/fish/config.fish" ;;
-        *)      echo "" ;;
+        *)      echo "$HOME/.profile" ;;
     esac
 }
 
-# Add INSTALL_DIR to PATH in the user's shell rc file if not already present.
-ensure_path() {
-    rc_file=$(resolve_rc_file)
-    [ -z "$rc_file" ] && return 1
-
-    if [ -f "$rc_file" ] && grep -qF "$INSTALL_DIR" "$rc_file" 2>/dev/null; then
+# Append a PATH export to a file unless it already contains INSTALL_DIR.
+_patch_rc() {
+    _file="$1"
+    if [ -f "$_file" ] && grep -qF "$INSTALL_DIR" "$_file" 2>/dev/null; then
         return 0
     fi
-
-    mkdir -p "$(dirname "$rc_file")"
-
-    case "${SHELL:-}" in
-        */fish)
-            printf '\nfish_add_path "%s"\n' "$INSTALL_DIR" >> "$rc_file"
-            ;;
+    mkdir -p "$(dirname "$_file")"
+    case "$_file" in
+        */config.fish)
+            printf '\nfish_add_path "%s"\n' "$INSTALL_DIR" >> "$_file" ;;
         *)
-            printf '\nexport PATH="%s:$PATH"\n' "$INSTALL_DIR" >> "$rc_file"
-            ;;
+            printf '\nexport PATH="%s:$PATH"\n' "$INSTALL_DIR" >> "$_file" ;;
     esac
+}
+
+# Add INSTALL_DIR to PATH in the user's shell rc file. On Linux also
+# patch ~/.profile so login shells (display-manager sessions, SSH, etc.)
+# pick up the path without requiring an interactive-shell rc file.
+ensure_path() {
+    rc_file=$(resolve_rc_file)
+    _patch_rc "$rc_file"
+
+    os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    if [ "$os" = "linux" ] && [ "$rc_file" != "$HOME/.profile" ]; then
+        _patch_rc "$HOME/.profile"
+    fi
+
     return 0
 }
 
 # Pre-flight: make sure we can actually write to INSTALL_DIR before downloading
-# anything. Fail fast with a useful message instead of cryptic mv permission errors.
+# anything. Walk up the directory tree until we find an existing ancestor,
+# since `mkdir -p` will create the intermediate directories.
 check_writable() {
     dir="$1"
-    if [ -d "$dir" ]; then
-        if [ ! -w "$dir" ]; then
-            err "$(printf '%s' "Cannot write to $dir.
+    target="$dir"
+    while [ ! -d "$dir" ]; do
+        dir=$(dirname "$dir")
+    done
+    if [ ! -w "$dir" ]; then
+        err "$(printf '%s' "Cannot write to $target ($dir is not writable).
     Re-run with sudo, or pick a writable location:
         AIRWALLEX_INSTALL_DIR=\$HOME/.local/bin curl -fsSL ... | sh")"
-        fi
-    else
-        parent=$(dirname "$dir")
-        if [ ! -w "$parent" ]; then
-            err "$(printf '%s' "Cannot create $dir (parent $parent is not writable).
-    Re-run with sudo, or pick a writable location:
-        AIRWALLEX_INSTALL_DIR=\$HOME/.local/bin curl -fsSL ... | sh")"
-        fi
     fi
 }
 
